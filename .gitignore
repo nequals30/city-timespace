@@ -1,2 +1,10 @@
 # Secrets
 *.config
+
+# Census Shape File
+*.cpg
+*.dbf
+*.prj
+*.shp
+*.xml
+*.shx
