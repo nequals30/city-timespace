@@ -1,5 +1,5 @@
 # stl_distance
-Re-projecting the geography of St. Louis by travel time
+Re-projecting the geography of St. Louis by travel time.
 
 Inspired by [Gradient Metrics'](http://gradientmetrics.com/) analysis [*New York City in Timespace*](http://gradientmetrics.com/new-york-city-in-timespace).
 
