@@ -16,9 +16,12 @@ from matplotlib import path
 import urllib.request
 import json
 
-#%% Overall Settings
+#%% Settings
 # --------------------------------------------------------
 ptResolution = 5
+
+apiKey = "" # Your Bing API key goes here
+
 
 #%% Generate a big dataframe of all urban area boundaries
 # --------------------------------------------------------
@@ -58,24 +61,47 @@ plt.show()
 
 
 #%% Get Distance Matrix from Bing API
+# --------------------------------------------------------
 xy_pairs = zip(y_pts,x_pts)
 coordString = str(xy_pairs).strip('[]')
 
 try:
-    pd.read_csv('yo.csv')
+    tempLoad = open('tempResults.txt','r')
+    result = json.load(tempLoad)
+    tempLoad.close()
 except IOError:
-# Request distance matrix from API --------------------------------------------
-    credentials = open('bing_credentials.config','r')
-    apiKey = credentials.readlines()[0].strip()
-    credentials.close()
-    theUrl = "https://dev.virtualearth.net/REST/v1/Routes/DistanceMatrix?origins=38.5926,-90.2820&destinations=38.7138,-90.2435&travelMode=driving&key=" + apiKey
+    # My API key is stored in a seperate file ---------------------------------
+    if not apiKey:
+        credentials = open('bing_credentials.config','r')
+        apiKey = credentials.readlines()[0].strip()
+        credentials.close()
     
+    # Construct the URL
+    latLon = ''
+    for i in range(len(y_pts)):
+        latLon += "{0:.4f},{1:.4f};".format(y_pts[i],x_pts[i])
+    latLon = latLon[:-1]
+        
+    theUrl = ("https://dev.virtualearth.net/REST/v1/Routes/DistanceMatrix?" +
+              "origins=" + latLon +
+              "&destinations=" + latLon + 
+              "&travelMode=driving&key=" + apiKey )
+    
+    # Request distance matrix from API ----------------------------------------
     request = urllib.request.Request(theUrl)
     response = urllib.request.urlopen(request)
     
     r = response.read().decode(encoding="utf-8")
     result = json.loads(r)
     
-    print(result["resourceSets"][0]["resources"][0]["results"][0]["travelDuration"])
+    tempSave = open('tempResults.txt','w')
+    json.dump(result,tempSave)
+    tempSave.close()
+
+
+#%% Turn results into distance matrix
+# --------------------------------------------------------
+print(result["resourceSets"][0]["resources"][0]["results"][0]["travelDuration"])
+
 
 print("end of analysis")

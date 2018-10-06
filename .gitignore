@@ -1,6 +1,9 @@
 # Secrets
 *.config
 
+# Temporary Results
+*.txt
+
 # Census Shape File
 *.cpg
 *.dbf
