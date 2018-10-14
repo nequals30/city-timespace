@@ -1,33 +1,40 @@
 # -*- coding: utf-8 -*-
 """
-Generates a bunch of equidistant lat/lon coordinate points within an urban
-area, and uses the Google maps API to compute the travel distance between them.
+Generates a bunch of equidistant lat/lon coordinate points within a US county, 
+then uses the Bing Distance Matrix API to get the distances between them.
 
-@author: nequals30 (http://www.nequals30.com)
+Then it uses multi-dimensional scaling (MDS) to re-map the coordinates in
+time-space.
+
+
+@author: Alik Ulmasov (http://www.nequals30.com)
 """
 
 #%% Imports
 # --------------------------------------------------------
 import shapefile
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import path
+from sklearn import manifold
+
 import urllib.request
 import json
 
 #%% Settings
 # --------------------------------------------------------
+apiKey = "" # Your Bing API key goes here
 ptResolution = 5
 
-apiKey = "" # Your Bing API key goes here
 
-
-#%% Generate a big dataframe of all urban area boundaries
+#%% Generate a big dataframe of all county boundaries
 # --------------------------------------------------------
-# Downloaded from here (unzip the contents into that folder, you will need
-# all the contents):
+# Downloaded from here:
 # https://www.census.gov/geo/maps-data/data/cbf/cbf_counties.html
+
+# Unzip the contents in this directory, you will need  all the contents
 # This will work with metro areas, urban areas, etc.
 
 shp = shapefile.Reader('cb_2017_us_county_500k/cb_2017_us_county_500k.shp')
@@ -35,6 +42,7 @@ fields = [x[0] for x in shp.fields][1:]
 records = shp.records()
 shps = [s.points for s in shp.shapes()]
 allAreas = pd.DataFrame(columns=fields, data=records)
+
 
 #%% Get outline for this specific county
 # --------------------------------------------------------
@@ -53,17 +61,9 @@ isInside = path_out.contains_points(np.vstack((x_pts,y_pts)).T)
 x_pts = x_pts[isInside]
 y_pts = y_pts[isInside]
 
-# Plot the results
-plt.plot(x_out,y_out)
-plt.scatter(x_pts,y_pts)
-#plt.axis([-90.5, -90, 38.5, 39])
-plt.show()
-
 
 #%% Get Distance Matrix from Bing API
 # --------------------------------------------------------
-xy_pairs = zip(y_pts,x_pts)
-coordString = str(xy_pairs).strip('[]')
 
 try:
     tempLoad = open('tempResults.txt','r')
@@ -94,6 +94,7 @@ except IOError:
     r = response.read().decode(encoding="utf-8")
     result = json.loads(r)
     
+    # Save off the result (so as not to call it again) ------------------------
     tempSave = open('tempResults.txt','w')
     json.dump(result,tempSave)
     tempSave.close()
@@ -101,7 +102,35 @@ except IOError:
 
 #%% Turn results into distance matrix
 # --------------------------------------------------------
-print(result["resourceSets"][0]["resources"][0]["results"][0]["travelDuration"])
+dmDict = result["resourceSets"][0]["resources"][0]["results"]
+
+origIdx = [x['originIndex'] for x in dmDict]
+destIdx = [x['destinationIndex'] for x in dmDict]
+dur = [x['travelDuration'] for x in dmDict]
+
+distMat = np.zeros((len(y_pts),len(x_pts)))
+distMat[origIdx,destIdx] = dur
+
+
+#%% Do Prinicpal Coordinates Analysis on the distance matrix
+# --------------------------------------------------------
+mds = manifold.MDS(n_components=2, dissimilarity="precomputed", random_state=2)
+coords = mds.fit(distMat).embedding_
+
+
+#%% Final Plotting
+# --------------------------------------------------------
+f, (ax1, ax2) = plt.subplots(1, 2)
+
+ax1.plot(x_out,y_out)
+ax1.scatter(x_pts,y_pts)
+for i in list(range(len(x_pts))):
+    ax1.annotate(str(i),(x_pts[i],y_pts[i]))
+
+ax2.scatter(coords[:, 0], coords[:, 1], marker = 'o')
+for i in list(range(len(x_pts))):
+    ax2.annotate(str(i),(coords[i,0],coords[i,1]))
+plt.show()
 
 
 print("end of analysis")
