@@ -19,6 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import path
 from sklearn import manifold
+from sklearn.decomposition import PCA
 
 import urllib.request
 import json
@@ -26,8 +27,9 @@ import json
 #%% Settings
 # --------------------------------------------------------
 apiKey = "" # Your Bing API key goes here
-ptResolution = 5
+ptResolution = 11
 
+countyGEOIDs = ['29510','29189']
 
 #%% Generate a big dataframe of all county boundaries
 # --------------------------------------------------------
@@ -43,13 +45,13 @@ records = shp.records()
 shps = [s.points for s in shp.shapes()]
 allAreas = pd.DataFrame(columns=fields, data=records)
 
-
-#%% Get outline for this specific county
+#%% Get outline for your specific counties and generate points
 # --------------------------------------------------------
-# how do I do a matlab find()? This seems like not the right way to do it:
-outline = shps[np.where(allAreas.GEOID.astype(str)=='29510')[0][0]]
-path_out = path.Path(outline)
-x_out, y_out = zip(*outline)
+idxShapes = np.where(np.isin(allAreas['GEOID'],countyGEOIDs))[0]
+
+thisOutline = shps[np.asscalar(idxShapes[0])]
+path_out = path.Path(thisOutline)
+x_out, y_out = zip(*thisOutline)
 
 # Generate coordinates inside the outline
 x_pts,y_pts = np.meshgrid(np.linspace(min(x_out),max(x_out),num=ptResolution),np.linspace(min(y_out),max(y_out),num=ptResolution))
@@ -61,7 +63,9 @@ isInside = path_out.contains_points(np.vstack((x_pts,y_pts)).T)
 x_pts = x_pts[isInside]
 y_pts = y_pts[isInside]
 
-
+plt.plot(x_out,y_out)
+plt.scatter(x_pts,y_pts)
+plt.show()
 #%% Get Distance Matrix from Bing API
 # --------------------------------------------------------
 
@@ -117,6 +121,13 @@ distMat[origIdx,destIdx] = dur
 mds = manifold.MDS(n_components=2, dissimilarity="precomputed", random_state=2)
 coords = mds.fit(distMat).embedding_
 
+#%% Aligning the points via PCA
+# --------------------------------------------------------
+pcaD = PCA(n_components=2)
+pcaT = PCA(n_components=2)
+pcaD.fit_transform(np.stack((x_pts,y_pts)).T)
+bro = pcaT.fit_transform(np.stack((coords[:,0],coords[:,1])).T)
+# rotate bro around its centroid by the eigenvector of pcaD
 
 #%% Final Plotting
 # --------------------------------------------------------
@@ -127,9 +138,9 @@ ax1.scatter(x_pts,y_pts)
 for i in list(range(len(x_pts))):
     ax1.annotate(str(i),(x_pts[i],y_pts[i]))
 
-ax2.scatter(coords[:, 0], coords[:, 1], marker = 'o')
+ax2.scatter(bro[:, 0], bro[:, 1], marker = 'o')
 for i in list(range(len(x_pts))):
-    ax2.annotate(str(i),(coords[i,0],coords[i,1]))
+    ax2.annotate(str(i),(bro[i,0],bro[i,1]))
 plt.show()
 
 
