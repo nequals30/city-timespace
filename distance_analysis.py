@@ -49,23 +49,28 @@ allAreas = pd.DataFrame(columns=fields, data=records)
 # --------------------------------------------------------
 idxShapes = np.where(np.isin(allAreas['GEOID'],countyGEOIDs))[0]
 
-thisOutline = shps[np.asscalar(idxShapes[0])]
-path_out = path.Path(thisOutline)
-x_out, y_out = zip(*thisOutline)
+outlines = pd.DataFrame(columns=['x','y'])
+for i in range(len(idxShapes)):
+    thisShape = shps[idxShapes[i]]
+    outlines = outlines.append(pd.DataFrame(thisShape,columns=['x','y']))
+pathsOut = path.Path(thisShape)
 
 # Generate coordinates inside the outline
-x_pts,y_pts = np.meshgrid(np.linspace(min(x_out),max(x_out),num=ptResolution),np.linspace(min(y_out),max(y_out),num=ptResolution))
+xRng = np.linspace(min(outlines['x']),max(outlines['x']),num=ptResolution)
+yRng = np.linspace(min(outlines['y']),max(outlines['y']),num=ptResolution)
+x_pts,y_pts = np.meshgrid(xRng,yRng)
 x_pts = x_pts.flatten()
 y_pts = y_pts.flatten()
 
 # Remove points outside the outline
-isInside = path_out.contains_points(np.vstack((x_pts,y_pts)).T)
+isInside = pathsOut.contains_points(np.vstack((x_pts,y_pts)).T)
 x_pts = x_pts[isInside]
 y_pts = y_pts[isInside]
 
-plt.plot(x_out,y_out)
+plt.plot(outlines['x'],outlines['y'])
 plt.scatter(x_pts,y_pts)
 plt.show()
+
 #%% Get Distance Matrix from Bing API
 # --------------------------------------------------------
 
