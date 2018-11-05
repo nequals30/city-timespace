@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Generates a bunch of equidistant lat/lon coordinate points within a US county, 
+Generates equidistant lat/lon coordinate points within a set of US counties, 
 then uses the Bing Distance Matrix API to get the distances between them.
 
 Then it uses multi-dimensional scaling (MDS) to re-map the coordinates in
-time-space.
-
+time-space, and plots the results.
 
 @author: Alik Ulmasov (http://www.nequals30.com)
 """
@@ -29,7 +28,7 @@ import json
 apiKey = "" # Your Bing API key goes here
 ptResolution = 11
 
-countyGEOIDs = ['29510','29189']
+countyGEOIDs = ['29510','29189'] #st. louis city and county
 
 #%% Generate a big dataframe of all county boundaries
 # --------------------------------------------------------
@@ -49,13 +48,14 @@ allAreas = pd.DataFrame(columns=fields, data=records)
 # --------------------------------------------------------
 idxShapes = np.where(np.isin(allAreas['GEOID'],countyGEOIDs))[0]
 
-outlines = pd.DataFrame(columns=['x','y'])
+# Combine the shapes for your counties
+w = shapefile.Writer()
 for i in range(len(idxShapes)):
-    thisShape = shps[idxShapes[i]]
-    outlines = outlines.append(pd.DataFrame(thisShape,columns=['x','y']))
-pathsOut = path.Path(thisShape)
+    w._shapes.extend(shps[idxShapes[i]])
+outlines = pd.DataFrame(w._shapes,columns=['x','y'])
+pathsOut = path.Path(w._shapes)
 
-# Generate coordinates inside the outline
+# Generate coordinates inside the bounding box of the outline
 xRng = np.linspace(min(outlines['x']),max(outlines['x']),num=ptResolution)
 yRng = np.linspace(min(outlines['y']),max(outlines['y']),num=ptResolution)
 x_pts,y_pts = np.meshgrid(xRng,yRng)
@@ -67,6 +67,7 @@ isInside = pathsOut.contains_points(np.vstack((x_pts,y_pts)).T)
 x_pts = x_pts[isInside]
 y_pts = y_pts[isInside]
 
+# Plot the outlines and the points inside
 plt.plot(outlines['x'],outlines['y'])
 plt.scatter(x_pts,y_pts)
 plt.show()
@@ -79,7 +80,7 @@ try:
     result = json.load(tempLoad)
     tempLoad.close()
 except IOError:
-    # My API key is stored in a seperate file ---------------------------------
+    # My API key is stored in a seperate file
     if not apiKey:
         credentials = open('bing_credentials.config','r')
         apiKey = credentials.readlines()[0].strip()
@@ -96,18 +97,17 @@ except IOError:
               "&destinations=" + latLon + 
               "&travelMode=driving&key=" + apiKey )
     
-    # Request distance matrix from API ----------------------------------------
+    # Request distance matrix from API
     request = urllib.request.Request(theUrl)
     response = urllib.request.urlopen(request)
     
     r = response.read().decode(encoding="utf-8")
     result = json.loads(r)
     
-    # Save off the result (so as not to call it again) ------------------------
+    # Save off the result (so as not to call it again)
     tempSave = open('tempResults.txt','w')
     json.dump(result,tempSave)
     tempSave.close()
-
 
 #%% Turn results into distance matrix
 # --------------------------------------------------------
@@ -120,33 +120,49 @@ dur = [x['travelDuration'] for x in dmDict]
 distMat = np.zeros((len(y_pts),len(x_pts)))
 distMat[origIdx,destIdx] = dur
 
-
 #%% Do Prinicpal Coordinates Analysis on the distance matrix
 # --------------------------------------------------------
 mds = manifold.MDS(n_components=2, dissimilarity="precomputed", random_state=2)
 coords = mds.fit(distMat).embedding_
 
-#%% Aligning the points via PCA
+#%% Align the points via PCA
 # --------------------------------------------------------
-pcaD = PCA(n_components=2)
-pcaT = PCA(n_components=2)
-pcaD.fit_transform(np.stack((x_pts,y_pts)).T)
-bro = pcaT.fit_transform(np.stack((coords[:,0],coords[:,1])).T)
-# rotate bro around its centroid by the eigenvector of pcaD
+pcaDist = PCA(n_components=2)
+pcaTime = PCA(n_components=2)
+distCoords = pcaDist.fit_transform(np.stack((x_pts,y_pts)).T)
+timeCoords = pcaTime.fit_transform(np.stack((coords[:,0],coords[:,1])).T)
+x_t = coords[:,0]
+y_t = coords[:,1]
 
-#%% Final Plotting
+# rotate time coordinates to align
+angle_d = np.arctan2(pcaDist.components_[0,1],pcaDist.components_[0,0])
+angle_t = np.arctan2(pcaTime.components_[0,1],pcaTime.components_[0,0])
+print(angle_d)
+print(angle_t)
+angle = -angle_t -np.pi
+
+ox = np.mean(x_t)
+oy = np.mean(y_t)
+x_time = ox + np.cos(angle)*(x_t - ox) - np.sin(angle)*(y_t - oy)
+y_time = oy + np.sin(angle)*(x_t - ox) + np.cos(angle)*(y_t - oy)
+
+# temporary: plot
+f, (ax1, ax2) = plt.subplots(1, 2)
+ax1.scatter(timeCoords[:,0],timeCoords[:,1])
+ax2.scatter(x_time,y_time, marker = 'o')
+for i in list(range(len(x_pts))):
+    ax1.annotate(str(i),(timeCoords[i,0],timeCoords[i,1]))
+    ax2.annotate(str(i),(x_time[i],y_time[i]))
+plt.show()
+
+#%% Plotting the results
 # --------------------------------------------------------
 f, (ax1, ax2) = plt.subplots(1, 2)
 
-ax1.plot(x_out,y_out)
+ax1.plot(outlines['x'],outlines['y'])
 ax1.scatter(x_pts,y_pts)
+ax2.scatter(coords[:,0], coords[:,1], marker = 'o')
 for i in list(range(len(x_pts))):
     ax1.annotate(str(i),(x_pts[i],y_pts[i]))
-
-ax2.scatter(bro[:, 0], bro[:, 1], marker = 'o')
-for i in list(range(len(x_pts))):
-    ax2.annotate(str(i),(bro[i,0],bro[i,1]))
+    ax2.annotate(str(i),(coords[i,0],coords[i,1]))
 plt.show()
-
-
-print("end of analysis")
