@@ -127,33 +127,28 @@ coords = mds.fit(distMat).embedding_
 
 #%% Align the points via PCA
 # --------------------------------------------------------
-pcaDist = PCA(n_components=2)
-pcaTime = PCA(n_components=2)
-distCoords = pcaDist.fit_transform(np.stack((x_pts,y_pts)).T)
-timeCoords = pcaTime.fit_transform(np.stack((coords[:,0],coords[:,1])).T)
-x_t = coords[:,0]
-y_t = coords[:,1]
+pcaD = PCA(n_components=2)
+pcaT = PCA(n_components=2)
+d_pca = pcaD.fit_transform(np.stack((x_pts,y_pts)).T)
+t_pca = pcaT.fit_transform(np.stack((coords[:,0],coords[:,1])).T)
 
-# rotate time coordinates to align
-angle_d = np.arctan2(pcaDist.components_[0,1],pcaDist.components_[0,0])
-angle_t = np.arctan2(pcaTime.components_[0,1],pcaTime.components_[0,0])
-print(angle_d)
-print(angle_t)
-angle = -angle_t -np.pi
+def rotateAroundCentroid(angle,x,y):
+    # counterclockwise
+    ox = np.mean(x)
+    oy = np.mean(y)
+    x_rot = ox + np.cos(angle)*(x - ox) - np.sin(angle)*(y - oy)
+    y_rot = oy + np.sin(angle)*(x - ox) + np.cos(angle)*(y - oy)
+    return x_rot,y_rot
 
-ox = np.mean(x_t)
-oy = np.mean(y_t)
-x_time = ox + np.cos(angle)*(x_t - ox) - np.sin(angle)*(y_t - oy)
-y_time = oy + np.sin(angle)*(x_t - ox) + np.cos(angle)*(y_t - oy)
+# rotating by -t will put it into pca space
+angle_t = np.arctan2(pcaT.components_[:,1],pcaT.components_[:,0])
+x_time,y_time = rotateAroundCentroid(-angle_t[0],coords[:,0],coords[:,1])
 
-# temporary: plot
-f, (ax1, ax2) = plt.subplots(1, 2)
-ax1.scatter(timeCoords[:,0],timeCoords[:,1])
-ax2.scatter(x_time,y_time, marker = 'o')
-for i in list(range(len(x_pts))):
-    ax1.annotate(str(i),(timeCoords[i,0],timeCoords[i,1]))
-    ax2.annotate(str(i),(x_time[i],y_time[i]))
-plt.show()
+if angle_t[0]-angle_t[1] == np.pi/2:
+    y_time = -y_time
+    
+angle_d = np.arctan2(pcaD.components_[:,1],pcaD.components_[:,0])
+x_time,y_time = rotateAroundCentroid(angle_d[0],x_time,y_time)
 
 #%% Plotting the results
 # --------------------------------------------------------
@@ -161,8 +156,11 @@ f, (ax1, ax2) = plt.subplots(1, 2)
 
 ax1.plot(outlines['x'],outlines['y'])
 ax1.scatter(x_pts,y_pts)
-ax2.scatter(coords[:,0], coords[:,1], marker = 'o')
+ax2.scatter(x_time, y_time, marker = 'o')
 for i in list(range(len(x_pts))):
     ax1.annotate(str(i),(x_pts[i],y_pts[i]))
-    ax2.annotate(str(i),(coords[i,0],coords[i,1]))
+    ax2.annotate(str(i),(x_time[i],y_time[i]))
+ax1.set_title('Distance Space')
+ax2.set_title('Time Space')
+    
 plt.show()
