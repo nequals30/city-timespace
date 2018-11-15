@@ -16,6 +16,7 @@ import shapefile
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.tri as tri
 from matplotlib import path
 from sklearn import manifold
 from sklearn.decomposition import PCA
@@ -50,8 +51,8 @@ idxShapes = np.where(np.isin(allAreas['GEOID'],countyGEOIDs))[0]
 
 # Combine the shapes for your counties
 w = shapefile.Writer()
-for i in range(len(idxShapes)):
-    w._shapes.extend(shps[idxShapes[i]])
+for i in idxShapes:
+    w._shapes.extend(shps[i])
 outlines = pd.DataFrame(w._shapes,columns=['x','y'])
 pathsOut = path.Path(w._shapes)
 
@@ -70,6 +71,7 @@ y_pts = y_pts[isInside]
 # Plot the outlines and the points inside
 plt.plot(outlines['x'],outlines['y'])
 plt.scatter(x_pts,y_pts)
+plt.axis('equal')
 plt.show()
 
 #%% Get Distance Matrix from Bing API
@@ -133,20 +135,20 @@ d_pca = pcaD.fit_transform(np.stack((x_pts,y_pts)).T)
 t_pca = pcaT.fit_transform(np.stack((coords[:,0],coords[:,1])).T)
 
 def rotateAroundCentroid(angle,x,y):
-    # counterclockwise
     ox = np.mean(x)
     oy = np.mean(y)
     x_rot = ox + np.cos(angle)*(x - ox) - np.sin(angle)*(y - oy)
     y_rot = oy + np.sin(angle)*(x - ox) + np.cos(angle)*(y - oy)
     return x_rot,y_rot
 
-# rotating by -t will put it into pca space
+# rotating by -t will put it into pca space, where D and T should be the same
 angle_t = np.arctan2(pcaT.components_[:,1],pcaT.components_[:,0])
 x_time,y_time = rotateAroundCentroid(-angle_t[0],coords[:,0],coords[:,1])
 
 if angle_t[0]-angle_t[1] == np.pi/2:
     y_time = -y_time
     
+# rotating it back by +p should align it with D
 angle_d = np.arctan2(pcaD.components_[:,1],pcaD.components_[:,0])
 x_time,y_time = rotateAroundCentroid(angle_d[0],x_time,y_time)
 
@@ -154,13 +156,30 @@ x_time,y_time = rotateAroundCentroid(angle_d[0],x_time,y_time)
 # --------------------------------------------------------
 f, (ax1, ax2) = plt.subplots(1, 2)
 
-ax1.plot(outlines['x'],outlines['y'])
-ax1.scatter(x_pts,y_pts)
-ax2.scatter(x_time, y_time, marker = 'o')
-for i in list(range(len(x_pts))):
-    ax1.annotate(str(i),(x_pts[i],y_pts[i]))
-    ax2.annotate(str(i),(x_time[i],y_time[i]))
 ax1.set_title('Distance Space')
-ax2.set_title('Time Space')
+for i in idxShapes:
+    thisOutline = np.array(shps[i])
+    ax1.plot(thisOutline[:,0],thisOutline[:,1])
     
+triang = tri.Triangulation(x_pts, y_pts)
+#ax1.triplot(triang, 'bo-', lw=1)
+    
+ax1.scatter(x_pts,y_pts)
+
+ax2.set_title('Time Space')
+ax2.scatter(x_time, y_time, marker = 'o')
+
+# -- Number the points, for debugging:
+#for i in list(range(len(x_pts))):
+#    ax1.annotate(str(i),(x_pts[i],y_pts[i]))
+#    ax2.annotate(str(i),(x_time[i],y_time[i]))
+
+for ax in (ax1, ax2):
+    #ax.axis('equal')
+    #ax.set(aspect='equal')
+    x0,x1 = ax.get_xlim()
+    y0,y1 = ax.get_ylim()
+    ax.set_aspect(abs(x1-x0)/abs(y1-y0))
+
+f.savefig('test.png', dpi=600)
 plt.show()
