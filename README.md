@@ -1,4 +1,4 @@
-# stl_distance
+# city-timespace
 Re-projecting the geography of a city by travel time.
 
 Inspired by [Gradient Metrics'](http://gradientmetrics.com/) analysis [*New York City in Timespace*](http://gradientmetrics.com/new-york-city-in-timespace).
