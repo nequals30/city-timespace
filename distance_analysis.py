@@ -28,7 +28,6 @@ import json
 # --------------------------------------------------------
 apiKey = "" # Your Bing API key goes here
 ptResolution = 11
-
 countyGEOIDs = ['29510','29189'] #st. louis city and county
 
 #%% Generate a big dataframe of all county boundaries
@@ -152,34 +151,52 @@ if angle_t[0]-angle_t[1] == np.pi/2:
 angle_d = np.arctan2(pcaD.components_[:,1],pcaD.components_[:,0])
 x_time,y_time = rotateAroundCentroid(angle_d[0],x_time,y_time)
 
+# additional nudge
+nudge = 30
+x_time,y_time = rotateAroundCentroid(np.deg2rad(nudge),x_time,y_time)
+
 #%% Plotting the results
 # --------------------------------------------------------
 f, (ax1, ax2) = plt.subplots(1, 2)
 
-ax1.set_title('Distance Space')
+usedC = np.sqrt((x_pts)**2 + (y_pts)**2)
+usedCmap = plt.cm.gist_rainbow
+labelSize = 5
+
+# -- Plot Distance Space
+ax1.set_title('DISTANCE')
 for i in idxShapes:
     thisOutline = np.array(shps[i])
     ax1.plot(thisOutline[:,0],thisOutline[:,1])
-    
-triang = tri.Triangulation(x_pts, y_pts)
-#ax1.triplot(triang, 'bo-', lw=1)
-    
-ax1.scatter(x_pts,y_pts)
+ax1.scatter(x_pts,y_pts,c=usedC,cmap=usedCmap)
+ax1.set_xlabel('LATITUDE', fontsize=labelSize,fontweight='bold')
+ax1.set_ylabel('LONGITUDE', fontsize=labelSize,fontweight='bold')
 
-ax2.set_title('Time Space')
-ax2.scatter(x_time, y_time, marker = 'o')
+# -- Plot Time-Space
+ax2.set_title('TIME', fontname="Arial", fontsize=12)
+ax2.scatter(x_time, y_time,c=usedC,cmap=usedCmap)
+ax2.set_xlabel('MINUTES BY CAR', fontsize=labelSize,fontweight='bold')
+ax2.set_ylabel('MINUTES BY CAR', fontsize=labelSize,fontweight='bold')
+
+# -- Making Plots Look Better
+for ax in (ax1, ax2):
+    x0,x1 = ax.get_xlim()
+    y0,y1 = ax.get_ylim()
+    ax.set_aspect(abs(x1-x0)/abs(y1-y0))
+    
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.spines["bottom"].set_visible(False)
+    
+    ax.tick_params(labelsize=5)
+    ax.xaxis.set_ticks_position('none')
+    ax.yaxis.set_ticks_position('none')
 
 # -- Number the points, for debugging:
 #for i in list(range(len(x_pts))):
 #    ax1.annotate(str(i),(x_pts[i],y_pts[i]))
 #    ax2.annotate(str(i),(x_time[i],y_time[i]))
 
-for ax in (ax1, ax2):
-    #ax.axis('equal')
-    #ax.set(aspect='equal')
-    x0,x1 = ax.get_xlim()
-    y0,y1 = ax.get_ylim()
-    ax.set_aspect(abs(x1-x0)/abs(y1-y0))
-
-f.savefig('test.png', dpi=600)
+f.savefig('test.png', dpi=300)
 plt.show()
