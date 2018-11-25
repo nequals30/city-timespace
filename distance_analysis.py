@@ -16,7 +16,6 @@ import shapefile
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.tri as tri
 from matplotlib import path
 from sklearn import manifold
 from sklearn.decomposition import PCA
@@ -30,7 +29,7 @@ apiKey = "" # Your Bing API key goes here
 ptResolution = 11
 countyGEOIDs = ['29510','29189'] #st. louis city and county
 
-#%% Generate a big dataframe of all county boundaries
+#%% Generate a big dataframe of all boundaries
 # --------------------------------------------------------
 # Downloaded from here:
 # https://www.census.gov/geo/maps-data/data/cbf/cbf_counties.html
@@ -164,16 +163,16 @@ usedCmap = plt.cm.gist_rainbow
 labelSize = 5
 
 # -- Plot Distance Space
-ax1.set_title('DISTANCE')
+ax1.set_title('DISTANCE',fontweight='bold', fontsize=13)
 for i in idxShapes:
     thisOutline = np.array(shps[i])
-    ax1.plot(thisOutline[:,0],thisOutline[:,1])
-ax1.scatter(x_pts,y_pts,c=usedC,cmap=usedCmap)
+    ax1.plot(thisOutline[:,0],thisOutline[:,1],color='gray',zorder=1)
+ax1.scatter(x_pts,y_pts,c=usedC,cmap=usedCmap,zorder=2)
 ax1.set_xlabel('LATITUDE', fontsize=labelSize,fontweight='bold')
 ax1.set_ylabel('LONGITUDE', fontsize=labelSize,fontweight='bold')
 
 # -- Plot Time-Space
-ax2.set_title('TIME', fontname="Arial", fontsize=12)
+ax2.set_title('TIME',fontweight='bold',fontname="Arial", fontsize=13)
 ax2.scatter(x_time, y_time,c=usedC,cmap=usedCmap)
 ax2.set_xlabel('MINUTES BY CAR', fontsize=labelSize,fontweight='bold')
 ax2.set_ylabel('MINUTES BY CAR', fontsize=labelSize,fontweight='bold')
@@ -189,7 +188,7 @@ for ax in (ax1, ax2):
     ax.spines["left"].set_visible(False)
     ax.spines["bottom"].set_visible(False)
     
-    ax.tick_params(labelsize=5)
+    ax.tick_params(labelsize=5,colors='gray')
     ax.xaxis.set_ticks_position('none')
     ax.yaxis.set_ticks_position('none')
 
